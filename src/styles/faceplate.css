@@ -1,0 +1,286 @@
+/* ─── the CT-505 chassis ────────────────────────────────────────────────── */
+
+.faceplate {
+  position: relative;
+  width: 1280px;
+  border-radius: 20px;
+  padding: 18px 30px 14px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 45%, var(--panel-lo) 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.25),
+    0 30px 80px rgba(0, 0, 0, 0.72),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.8s;
+}
+/* dark plastic end caps */
+.faceplate::before,
+.faceplate::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  width: 13px;
+  background: linear-gradient(90deg, #3a3b3e, #212226 60%, #17181b);
+  border-radius: 8px 3px 3px 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 2px 0 5px rgba(0, 0, 0, 0.3);
+  z-index: 0;
+}
+.faceplate::before { left: -9px; }
+.faceplate::after { right: -9px; transform: scaleX(-1); }
+
+/* ─── screws ── */
+.screw {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #f2f2ef, #a9aaa5 55%, #6f706b);
+  box-shadow: inset 0 -1.5px 2px rgba(0, 0, 0, 0.55), 0 1px 1.5px rgba(255, 255, 255, 0.5), 0 -0.5px 1px rgba(0,0,0,0.3);
+  z-index: 5;
+}
+.screw-slot {
+  position: absolute;
+  left: 1.8px;
+  right: 1.8px;
+  top: 50%;
+  height: 1.8px;
+  margin-top: -0.9px;
+  background: linear-gradient(180deg, #4c4d49, #303029);
+  border-radius: 1px;
+}
+.screw-tl { top: 9px; left: 12px; } .screw-tl .screw-slot { transform: rotate(37deg); }
+.screw-tr { top: 9px; right: 12px; } .screw-tr .screw-slot { transform: rotate(-21deg); }
+.screw-bl { bottom: 9px; left: 12px; } .screw-bl .screw-slot { transform: rotate(74deg); }
+.screw-br { bottom: 9px; right: 12px; } .screw-br .screw-slot { transform: rotate(-58deg); }
+
+/* faint psychedelic silkscreen spirals */
+.silk-spiral {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  opacity: 0.1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23232420' stroke-width='2'%3E%3Cpath d='M50 50 m0 -3 a3 3 0 1 1 -3 3 a6 6 0 1 1 6 -6 a12 12 0 1 1 -12 12 a20 20 0 1 1 20 -20 a30 30 0 1 1 -30 30 a42 42 0 1 1 42 -42'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: contain;
+  z-index: 0;
+}
+.silk-spiral-l { left: 210px; bottom: 148px; }
+.silk-spiral-r { right: 250px; top: 66px; width: 90px; height: 90px; }
+
+/* ─── header ── */
+.ct-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 2px 6px 10px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.brand { display: flex; align-items: baseline; gap: 14px; }
+.brand-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 52px;
+  line-height: 0.86;
+  letter-spacing: -0.015em;
+  color: #26272a;
+  text-shadow:
+    1px 1px 0 rgba(255, 255, 255, 0.5),
+    -1px -1px 0 rgba(0, 0, 0, 0.25);
+}
+.brand-t { color: var(--accent); text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.4), -1px -1px 0 rgba(0, 0, 0, 0.3); }
+.brand-oval {
+  font-style: italic;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #26272a;
+  border: 2.5px solid #26272a;
+  border-radius: 999px;
+  padding: 1px 13px 2px;
+}
+.brand-mid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+.brand-squares { display: flex; gap: 3px; }
+.brand-squares i { width: 13px; height: 8px; display: block; box-shadow: inset 0 0 1px rgba(0,0,0,0.4); }
+.brand-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: var(--silk-dim);
+  white-space: nowrap;
+}
+.brand-right { display: flex; align-items: flex-end; gap: 18px; }
+.brand-model {
+  font-weight: 800;
+  font-style: italic;
+  font-size: 38px;
+  line-height: 0.9;
+  color: #55564f;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.02em;
+}
+.header-leds { display: flex; gap: 12px; padding-bottom: 5px; }
+.hled {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--silk-dim);
+}
+
+/* ─── mid row layout ── */
+.ct-mid {
+  display: grid;
+  grid-template-columns: 232px 1fr 190px;
+  gap: 22px;
+  align-items: stretch;
+  position: relative;
+  z-index: 1;
+}
+.ct-mid-left { display: flex; flex-direction: column; gap: 14px; }
+.ct-mid-center { min-width: 0; }
+.ct-mid-right { display: flex; flex-direction: column; gap: 12px; }
+
+/* ─── seg panel ── */
+.seg-panel { display: flex; flex-direction: column; align-items: center; }
+.seg-panel .section-title { align-self: stretch; }
+.seg7 {
+  background: linear-gradient(180deg, #1c0705, #120303);
+  border-radius: 6px;
+  padding: 4px 8px 2px;
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.seg-on { fill: #ff3423; filter: drop-shadow(0 0 3px rgba(255, 52, 35, 0.9)); }
+.seg-off { fill: #3d0f0a; opacity: 0.5; }
+.seg7-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #a3423a;
+  padding-bottom: 2px;
+}
+.seg-mode { display: flex; gap: 10px; margin-top: 5px; }
+.seg-mode span { font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em; }
+.seg-mode-on { color: var(--accent-red); }
+.seg-mode-off { color: var(--silk-dim); opacity: 0.6; }
+.seg-done { margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: var(--silk-dim); }
+
+/* ─── fader ── */
+.fader-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 2px;
+}
+.fader-title { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
+.fader-track { position: relative; width: 74px; flex: 1; min-height: 150px; cursor: ns-resize; touch-action: none; }
+.fader-slot {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 6px;
+  width: 7px;
+  margin-left: -3.5px;
+  background: linear-gradient(90deg, #131316, #2c2d31 50%, #131316);
+  border-radius: 3px;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.fader-scale {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--silk-dim);
+}
+.fader-thumb {
+  position: absolute;
+  left: 50%;
+  width: 36px;
+  height: 20px;
+  margin: -10px 0 0 -18px;
+  border-radius: 3.5px;
+  background: linear-gradient(180deg, #4b4c51, #28292d 46%, #35363b 54%, #1e1f23);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.fader-thumb::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: #e8e6de;
+  border-radius: 1px;
+}
+.fader-led { margin-top: 2px; }
+.fader-value { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; color: var(--silk); }
+
+/* ─── bottom row ── */
+.ct-bottom {
+  display: grid;
+  grid-template-columns: 1fr 218px;
+  gap: 22px;
+  margin-top: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── footer ── */
+.ct-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 12px;
+  padding: 7px 6px 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+.silk-hints { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; color: var(--silk-dim); }
+.silk-slogan {
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #7c7d75;
+  text-transform: lowercase;
+}
+.serial { display: flex; align-items: center; gap: 8px; }
+.barcode {
+  width: 74px;
+  height: 16px;
+  background: repeating-linear-gradient(
+    90deg,
+    #26272a 0 1.5px, transparent 1.5px 3.5px,
+    #26272a 3.5px 6.5px, transparent 6.5px 8px,
+    #26272a 8px 8.8px, transparent 8.8px 12px
+  );
+}
+.serial-no { font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; color: var(--silk-dim); }

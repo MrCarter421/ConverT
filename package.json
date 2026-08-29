@@ -1,0 +1,32 @@
+{
+  "name": "convert",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ConverT CT-505 — total sonic conversion system. Audiophile-grade audio converter with a groovebox soul.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "@fontsource/barlow-condensed": "^5.1.0",
+    "@fontsource/vt323": "^5.1.0",
+    "fflate": "^0.8.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.49.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.3.5"
+  }
+}

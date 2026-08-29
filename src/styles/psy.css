@@ -1,0 +1,89 @@
+/* ─── the liquid lightshow behind the hardware ─────────────────────────── */
+
+.psy {
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 30% 20%, #191423 0%, transparent 60%),
+    radial-gradient(ellipse at 75% 80%, #101c1c 0%, transparent 55%),
+    #0b0b10;
+  animation: psy-hue 140s linear infinite;
+}
+
+.psy-blob {
+  position: absolute;
+  width: 68vmax;
+  height: 68vmax;
+  border-radius: 50%;
+  filter: blur(46px) saturate(1.25);
+  opacity: 0.6;
+  will-change: transform;
+}
+.psy-b1 { background: radial-gradient(circle, rgba(255, 31, 143, 0.85) 0%, rgba(255, 31, 143, 0.3) 34%, transparent 66%); top: -16%; left: -12%; animation: drift1 52s ease-in-out infinite alternate; }
+.psy-b2 { background: radial-gradient(circle, rgba(22, 224, 184, 0.8) 0%, rgba(22, 224, 184, 0.28) 34%, transparent 66%); top: 26%; right: -20%; animation: drift2 64s ease-in-out infinite alternate; }
+.psy-b3 { background: radial-gradient(circle, rgba(157, 255, 46, 0.7) 0%, rgba(157, 255, 46, 0.22) 32%, transparent 64%); bottom: -26%; left: 12%; animation: drift3 47s ease-in-out infinite alternate; opacity: 0.42; }
+.psy-b4 { background: radial-gradient(circle, rgba(122, 43, 255, 0.85) 0%, rgba(122, 43, 255, 0.3) 34%, transparent 66%); top: -20%; right: 8%; animation: drift4 73s ease-in-out infinite alternate; }
+.psy-b5 { background: radial-gradient(circle, rgba(255, 154, 31, 0.75) 0%, rgba(255, 154, 31, 0.24) 32%, transparent 62%); bottom: -12%; right: 26%; animation: drift1 58s ease-in-out infinite alternate-reverse; opacity: 0.38; }
+
+@keyframes drift1 { from { transform: translate(0, 0) scale(1); } to { transform: translate(14vw, 10vh) scale(1.25); } }
+@keyframes drift2 { from { transform: translate(0, 0) scale(1.15); } to { transform: translate(-12vw, -8vh) scale(0.9) rotate(40deg); } }
+@keyframes drift3 { from { transform: translate(0, 0) scale(0.92); } to { transform: translate(10vw, -12vh) scale(1.3); } }
+@keyframes drift4 { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-8vw, 14vh) scale(0.85); } }
+@keyframes psy-hue { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+
+.psy-swirl {
+  position: absolute;
+  inset: -20%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 31, 143, 0.16), rgba(157, 255, 46, 0.13), rgba(22, 224, 184, 0.16),
+    rgba(122, 43, 255, 0.13), rgba(255, 154, 31, 0.16), rgba(255, 31, 143, 0.16)
+  );
+  filter: blur(40px);
+  opacity: 0;
+  animation: swirl-spin 40s linear infinite;
+  transition: opacity 1.2s;
+}
+@keyframes swirl-spin { to { transform: rotate(360deg); } }
+
+.psy-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.8'/%3E%3C/svg%3E");
+}
+
+/* ── TRIP MODE: the sugar cube kicks in ── */
+.psy-trip { animation-duration: 28s; }
+.psy-trip .psy-blob { opacity: 0.85; filter: blur(38px) saturate(1.9); }
+.psy-trip .psy-b1 { animation-duration: 13s; }
+.psy-trip .psy-b2 { animation-duration: 17s; }
+.psy-trip .psy-b3 { animation-duration: 11s; opacity: 0.55; }
+.psy-trip .psy-b4 { animation-duration: 19s; }
+.psy-trip .psy-b5 { animation-duration: 15s; opacity: 0.5; }
+.psy-trip .psy-swirl { opacity: 1; animation-duration: 14s; }
+
+.app-trip .faceplate {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 30px 80px rgba(0, 0, 0, 0.75),
+    0 0 60px 6px rgba(255, 31, 143, 0.28),
+    0 0 120px 20px rgba(22, 224, 184, 0.22);
+}
+.app-trip .brand-logo {
+  background: linear-gradient(100deg, #ff1f8f, #ff9a1f, #9dff2e, #16e0b8, #7a2bff, #ff1f8f);
+  background-size: 400% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: logo-rave 4s linear infinite;
+}
+@keyframes logo-rave { to { background-position: 400% 0; } }
+.app-trip .silk-spiral { opacity: 0.35; animation: spiral-spin 9s linear infinite; }
+@keyframes spiral-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .psy, .psy-blob, .psy-swirl, .app-trip .brand-logo, .app-trip .silk-spiral { animation: none !important; }
+}

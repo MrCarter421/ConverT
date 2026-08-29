@@ -1,0 +1,173 @@
+/* ─── the rubber pad banks ──────────────────────────────────────────────── */
+
+.pad-section {
+  display: flex;
+  gap: 12px;
+  background: linear-gradient(180deg, #2a2b2f, #212226 70%, #1b1c20);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.65),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.bank-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  width: 52px;
+  flex: none;
+}
+.bank-title {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #9b9c93;
+  text-align: center;
+  padding-top: 2px;
+}
+.bank-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #dcd9cf;
+  background: linear-gradient(180deg, #3e3f44, #26272b);
+  border: 1px solid #141518;
+  border-radius: 4px;
+  padding: 5px 0 4px;
+  box-shadow: 0 2px 0 #101114, inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.bank-btn:active { transform: translateY(2px); box-shadow: 0 0 0 #101114; }
+.bank-on { color: #ffd9b8; border-color: #6b3708; }
+.bank-btn .led { width: 6px; height: 6px; }
+.bank-count {
+  margin-top: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #9b9c93;
+  text-align: center;
+}
+
+.pad-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 9px;
+}
+
+.pad {
+  position: relative;
+  min-height: 78px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #303136 0%, #232428 40%, #1d1e22 100%);
+  box-shadow:
+    0 3px 0 #0e0f12,
+    0 4px 7px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  padding: 6px 7px 5px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.05s, box-shadow 0.08s, outline-color 0.1s;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+}
+.pad:active:not(.pad-empty) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0e0f12, 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.pad-empty {
+  cursor: default;
+  background: linear-gradient(180deg, #26272b 0%, #1e1f23 100%);
+  box-shadow: 0 2px 0 #0e0f12, inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.pad-selected { outline-color: var(--accent); }
+.pad-done { background: linear-gradient(180deg, #2c3a2c 0%, #22301f 40%, #1b2619 100%); }
+.pad-error { background: linear-gradient(180deg, #40262a 0%, #301d1e 40%, #241618 100%); }
+
+.pad-led { position: absolute; top: 7px; left: 7px; }
+.pad-num {
+  position: absolute;
+  top: 4px;
+  right: 7px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #66675f;
+  letter-spacing: 0.08em;
+}
+.pad-x {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: #d9d6cc;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pad:hover .pad-x { opacity: 1; }
+.pad-x:hover { background: var(--accent-red); color: #fff; }
+.pad:hover .pad-num { opacity: 0; }
+
+.pad-ghost {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3c3d42;
+  font-size: 20px;
+}
+
+.pad-name {
+  margin-top: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #e6e3da;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pad-sub {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #90918a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.pad-sub-done { color: #7de06a; }
+.pad-sub-error { color: #ff7a6e; }
+.pad-sub-converting { color: #ffc27a; }
+
+.pad-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.pad-progress > div {
+  height: 100%;
+  background: linear-gradient(90deg, #52e83c, #b7f24a);
+  box-shadow: 0 0 6px rgba(120, 240, 70, 0.8);
+  transition: width 0.2s linear;
+}
