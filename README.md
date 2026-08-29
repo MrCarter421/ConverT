@@ -23,6 +23,19 @@ npm run build      # → dist/
 npm run preview
 ```
 
+### Deploying (GitHub Pages)
+
+The repo is **source code** — Pages must serve the *built* `dist/`, never the repo root
+(serving raw `src/main.tsx` is how you get a blank white page).
+`.github/workflows/deploy.yml` does this automatically: every push builds the app and
+publishes `dist/` to Pages.
+
+One-time setup, if the workflow's auto-enable step is blocked: repo **Settings → Pages →
+Build and deployment → Source: “GitHub Actions”**. After a green run the app lives at
+`https://<user>.github.io/ConverT/`. The Vite `base` is relative (`'./'`), so the same
+build also works at a domain root or any other subpath; `scripts/pages-smoke.mjs` boots
+the built app under a simulated `/ConverT/` prefix and runs a conversion to guard this.
+
 ## The signal path (a.k.a. the gold cables)
 
 Quality rules the arg builder (`src/audio/args.ts`) lives by:

@@ -12,7 +12,12 @@ npm run build      # tsc -b && vite build  (run before e2e/sweep)
 npm run e2e        # headless-Chromium conversion tests + screenshots → scripts/.artifacts/
 node scripts/sweep-formats.mjs   # every format must encode; run after touching formats.ts
 node scripts/shots.mjs           # UI state screenshots (idle/loaded/converting/done/trip)
+node scripts/pages-smoke.mjs     # serves dist/ under a /ConverT/ subpath like GitHub Pages
 ```
+
+Deploys: `.github/workflows/deploy.yml` builds and publishes `dist/` to GitHub Pages on
+push. Vite `base` is `'./'` (relative) so the build works at any subpath — keep it that
+way, and re-run `pages-smoke.mjs` after touching vite.config or asset/worker loading.
 
 Chromium for scripts comes from `/opt/pw-browsers/chromium` (playwright-core, no download).
 

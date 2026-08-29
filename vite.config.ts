@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // relative base so the built app works from any path — the domain root,
+  // a local file server, or GitHub Pages' /ConverT/ subpath
+  base: './',
   plugins: [react()],
   optimizeDeps: {
     // ffmpeg.wasm spawns its own module worker; pre-bundling breaks the worker URL resolution
