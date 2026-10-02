@@ -1,68 +1,55 @@
 import { useEffect, useState } from 'react';
-import { Faceplate } from './ui/Faceplate';
+import { Sky } from './ui/Sky';
+import { Player } from './ui/Player';
+import { PresetWindow } from './ui/popups/PresetWindow';
+import { SettingsWindow } from './ui/popups/SettingsWindow';
+import { HelpWindow } from './ui/popups/HelpWindow';
 import {
-  addFiles, bootEngine, removeFile, stepFile, stopBatch, useCt,
+  addFiles, bootEngine, closePopup, stopBatch, useCt,
 } from './state/store';
 
-const DESIGN_W = 1280;
-
-function usePlateScale(): number {
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const update = () => setScale(Math.min(1, (window.innerWidth - 16) / DESIGN_W));
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  return scale;
-}
-
-function PsyBackground({ trip }: { trip: boolean }) {
-  return (
-    <div className={`psy ${trip ? 'psy-trip' : ''}`} aria-hidden>
-      <div className="psy-blob psy-b1" />
-      <div className="psy-blob psy-b2" />
-      <div className="psy-blob psy-b3" />
-      <div className="psy-blob psy-b4" />
-      <div className="psy-blob psy-b5" />
-      <div className="psy-swirl" />
-      <div className="psy-grain" />
-    </div>
-  );
-}
+const THEME_COLOR = { day: '#1f8fd8', night: '#061a33' } as const;
 
 export default function App() {
-  const trip = useCt((s) => s.trip);
-  const running = useCt((s) => s.running);
-  const selectedId = useCt((s) => s.selectedId);
+  const skin = useCt((s) => s.skin);
+  const motion = useCt((s) => s.motion);
+  const popup = useCt((s) => s.popup);
   const [dragging, setDragging] = useState(false);
-  const scale = usePlateScale();
 
   useEffect(() => {
     void bootEngine();
   }, []);
 
-  // whole-window drag & drop
+  useEffect(() => {
+    document.documentElement.dataset.skin = skin;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[skin]);
+  }, [skin]);
+
+  // the whole window is a drop target
   useEffect(() => {
     let depth = 0;
+    const hasFiles = (e: DragEvent) => Boolean(e.dataTransfer?.types.includes('Files'));
     const enter = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes('Files')) return;
+      if (!hasFiles(e)) return;
       depth += 1;
       setDragging(true);
     };
     const over = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+      if (hasFiles(e)) e.preventDefault();
     };
     const leave = () => {
       depth = Math.max(0, depth - 1);
       if (depth === 0) setDragging(false);
     };
     const drop = (e: DragEvent) => {
-      if (!e.dataTransfer?.files.length) return;
+      if (!hasFiles(e)) return;
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      addFiles(e.dataTransfer.files);
+      if (e.dataTransfer?.files.length) {
+        addFiles(e.dataTransfer.files);
+        closePopup();
+      }
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragover', over);
@@ -76,30 +63,27 @@ export default function App() {
     };
   }, []);
 
-  // hardware-ish keyboard control
+  // Esc: close the pop-up first, otherwise stop a running batch
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
-      if (e.key === 'Escape' && running) void stopBatch();
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && el.tagName !== 'BUTTON' && !el.classList.contains('pad')) {
-        removeFile(selectedId);
-      }
-      if (e.key === 'ArrowRight' && el.tagName === 'BODY') stepFile(1);
-      if (e.key === 'ArrowLeft' && el.tagName === 'BODY') stepFile(-1);
+      if (e.key !== 'Escape') return;
+      if (useCt.getState().popup) closePopup();
+      else if (useCt.getState().running) void stopBatch();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [running, selectedId]);
+  }, []);
 
   return (
-    <div className={`app ${trip ? 'app-trip' : ''}`}>
-      <PsyBackground trip={trip} />
-      <div className="stage-clamp" style={{ height: `calc(${scale} * var(--plate-h, 980px))` }}>
-        <div className="stage" style={{ transform: `scale(${scale})` }}>
-          <Faceplate dragging={dragging} />
-        </div>
-      </div>
+    <div className={`app ${motion ? '' : 'is-still'}`}>
+      <Sky />
+      <main className="stage">
+        <Player dragging={dragging} />
+        <p className="stage-foot">100% local · your audio never leaves this computer</p>
+      </main>
+      {popup === 'preset' && <PresetWindow />}
+      {popup === 'settings' && <SettingsWindow />}
+      {popup === 'help' && <HelpWindow />}
     </div>
   );
 }

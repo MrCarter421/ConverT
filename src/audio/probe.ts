@@ -1,4 +1,4 @@
-// ─── ConverT CT-505 · input analyzer ─────────────────────────────────────────
+// ─── ConverT · input analyzer ────────────────────────────────────────────────
 // Parses `ffmpeg -i` stderr into a ProbeInfo. Works for anything the decoder
 // can open — including video containers, whose audio we happily extract.
 

@@ -1,4 +1,4 @@
-// ─── ConverT CT-505 · shared domain types ────────────────────────────────────
+// ─── ConverT · shared domain types ───────────────────────────────────────────
 
 export type FormatId =
   | 'wav' | 'flac' | 'mp3' | 'aac' | 'alac'
@@ -19,10 +19,14 @@ export type DitherChoice =
 /** EBU R128 two-pass loudness normalization target (LUFS) or off. */
 export type NormChoice = 'off' | -14 | -16 | -18 | -23;
 
+/** library shelves in the preset window */
+export type PresetGroup = 'lossy' | 'lossless' | 'studio' | 'loudness' | 'mine';
+
 export interface Preset {
   id: string;
   name: string;
   factory?: boolean;
+  group?: PresetGroup;
   format: FormatId;
   /** id of a QualityValue within the format */
   quality: string;
@@ -80,7 +84,8 @@ export interface FileEntry {
   error?: string;
 }
 
-export type LcdPage = 'file' | 'preset' | 'sys' | 'log';
+export type Popup = 'preset' | 'settings' | 'help' | null;
+export type Skin = 'day' | 'night';
 export type EngineState = 'boot' | 'loading' | 'ready' | 'error';
 
 export interface LoudnormMeasured {

@@ -1,0 +1,107 @@
+/* ─── the Frutiger Aero desktop behind the player ─────────────────────────── */
+
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 50% 108%, var(--sky-3) 0%, transparent 60%),
+    linear-gradient(180deg, var(--sky-0) 0%, var(--sky-1) 38%, var(--sky-2) 72%, var(--sky-3) 100%);
+  transition: background 0.6s;
+}
+
+.sky-sun {
+  position: absolute;
+  top: -18vmax;
+  left: -12vmax;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--sun) 0%, transparent 62%);
+  opacity: 0.85;
+}
+
+.sky-stars {
+  position: absolute;
+  inset: 0 0 35% 0;
+  opacity: var(--stars);
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 27% 42%, #cfe8ff 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 44% 12%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 33%, #bfe6ff 50%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 71% 9%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 83% 27%, #dff3ff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 92% 48%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 55%, #cfe8ff 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 36% 66%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 64% 58%, #dff3ff 50%, transparent 51%);
+  transition: opacity 0.6s;
+}
+
+.sky-cloud {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--cloud) 0%, transparent 68%);
+  filter: blur(8px);
+  animation: cloud-drift linear infinite alternate;
+}
+.sky-cloud.c1 { width: 46vw; height: 15vw; top: 9%; left: 48%; animation-duration: 95s; }
+.sky-cloud.c2 { width: 34vw; height: 11vw; top: 26%; left: -6%; animation-duration: 120s; animation-direction: alternate-reverse; opacity: 0.8; }
+.sky-cloud.c3 { width: 26vw; height: 8vw; top: 40%; left: 70%; animation-duration: 80s; opacity: 0.6; }
+@keyframes cloud-drift { from { translate: -6vw 0; } to { translate: 8vw 0; } }
+
+.sky-ribbons {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.rib-stop-0 { stop-color: var(--rib-a); stop-opacity: 0; }
+.rib-stop-a { stop-color: var(--rib-a); stop-opacity: 1; }
+.rib-stop-b { stop-color: var(--rib-b); stop-opacity: 1; }
+.rib-band { filter: blur(14px); opacity: 0.7; }
+.rib-line { fill: none; stroke-width: 3; opacity: 0.7; filter: blur(0.6px); }
+.rib-line.thin { stroke-width: 1.5; opacity: 0.55; }
+.sky-ribbons { animation: ribbon-sway 26s ease-in-out infinite alternate; transform-origin: 50% 70%; }
+@keyframes ribbon-sway { from { transform: translateY(0) scaleY(1); } to { transform: translateY(-2.5vh) scaleY(1.06); } }
+
+.sky-hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 24vh;
+  min-height: 120px;
+}
+.hill-stop-0 { stop-color: var(--hill-0); }
+.hill-stop-1 { stop-color: var(--hill-1); }
+.hill-stop-2 { stop-color: var(--hill-2); }
+.hill-shine { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 2; filter: blur(1px); }
+
+/* glossy soap bubbles drifting up */
+.bubbles i {
+  position: absolute;
+  bottom: -90px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0 9%, transparent 22%),
+    radial-gradient(circle at 70% 78%, rgba(255, 255, 255, 0.35) 0 6%, transparent 18%),
+    radial-gradient(circle, var(--bubble-fill) 55%, var(--bubble-rim) 72%, transparent 74%);
+  animation: bubble-rise linear infinite;
+  will-change: transform;
+}
+@keyframes bubble-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  8% { opacity: 0.9; }
+  50% { transform: translate(var(--sway), -55vh); }
+  92% { opacity: 0.8; }
+  100% { transform: translate(0, -115vh); opacity: 0; }
+}
+
+/* motion off: freeze the sky where it is */
+.is-still .sky *, .is-still .sky { animation-play-state: paused !important; }
+.is-still .bubbles { display: none; }

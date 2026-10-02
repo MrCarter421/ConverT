@@ -1,14 +1,14 @@
-// ─── ConverT CT-505 · format registry ────────────────────────────────────────
+// ─── ConverT · format registry ───────────────────────────────────────────────
 // Every target format is declared here. Adding a new format = adding an entry;
-// knobs, presets, LCD readouts and the arg builder all derive from this table.
+// the preset window, display readouts and the arg builder all derive from it.
 
 import type { BitDepth, FormatId, ProbeInfo } from '../types';
 
 export interface QualityValue {
   id: string;
-  /** short label printed on the knob scale */
+  /** short chip label ("320", "V0", "MAX") */
   knob: string;
-  /** longer label for the LCD */
+  /** longer display label ("CBR 320K") */
   lcd: string;
   /** encoder-quality args (bitrate / vbr / compression level) */
   args: string[];
@@ -23,9 +23,11 @@ export interface LosslessCodec {
 
 export interface FormatDef {
   id: FormatId;
-  /** short label on the FORMAT knob */
+  /** short chip / display label */
   knob: string;
   name: string;
+  /** one-line plain-language description for the preset window */
+  blurb: string;
   ext: string;
   mime: string;
   muxer: string;
@@ -57,6 +59,7 @@ const VORBIS_RATES = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 960
 export const FORMATS: Record<FormatId, FormatDef> = {
   wav: {
     id: 'wav', knob: 'WAV', name: 'WAV · PCM', ext: 'wav', mime: 'audio/wav',
+    blurb: 'Uncompressed PCM · plays everywhere',
     muxer: 'wav', lossless: true, coverArt: false,
     depths: [16, 24, '32f'],
     qualities: [q('pcm', 'PCM', 'LINEAR PCM')],
@@ -70,6 +73,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   aiff: {
     id: 'aiff', knob: 'AIFF', name: 'AIFF · PCM', ext: 'aiff', mime: 'audio/aiff',
+    blurb: 'Uncompressed PCM · Apple & pro-audio classic',
     muxer: 'aiff', lossless: true, coverArt: false,
     depths: [16, 24, '32f'],
     qualities: [q('pcm', 'PCM', 'LINEAR PCM')],
@@ -82,6 +86,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   flac: {
     id: 'flac', knob: 'FLAC', name: 'FLAC LOSSLESS', ext: 'flac', mime: 'audio/flac',
+    blurb: 'Lossless · roughly half the size · tags + cover art',
     muxer: 'flac', lossless: true, coverArt: true,
     depths: [16, 24],
     qualities: [
@@ -99,6 +104,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   alac: {
     id: 'alac', knob: 'ALAC', name: 'APPLE LOSSLESS', ext: 'm4a', mime: 'audio/mp4',
+    blurb: 'Lossless · native to Apple Music & iPhone',
     muxer: 'ipod', lossless: true, coverArt: true,
     depths: [16, 24],
     qualities: [q('alac', 'ALAC', 'APPLE LOSSLESS')],
@@ -112,6 +118,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   wv: {
     id: 'wv', knob: 'WV', name: 'WAVPACK', ext: 'wv', mime: 'audio/x-wavpack',
+    blurb: 'Lossless · compact · can hold 32-bit float',
     muxer: 'wv', lossless: true, coverArt: false,
     depths: [16, 24, '32f'],
     qualities: [
@@ -128,6 +135,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   mp3: {
     id: 'mp3', knob: 'MP3', name: 'MP3 · LAME', ext: 'mp3', mime: 'audio/mpeg',
+    blurb: 'LAME at maximum effort · plays on anything',
     muxer: 'mp3', lossless: false, coverArt: true,
     rates: MP3_RATES,
     codec: 'libmp3lame',
@@ -147,6 +155,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   aac: {
     id: 'aac', knob: 'AAC', name: 'AAC · M4A', ext: 'm4a', mime: 'audio/mp4',
+    blurb: 'Modern lossy · the Apple / YouTube standard',
     muxer: 'ipod', lossless: false, coverArt: true,
     rates: AAC_RATES,
     codec: 'aac',
@@ -163,6 +172,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   ogg: {
     id: 'ogg', knob: 'OGG', name: 'OGG VORBIS', ext: 'ogg', mime: 'audio/ogg',
+    blurb: 'Open-source lossy · strong at mid bitrates',
     muxer: 'ogg', lossless: false, coverArt: false,
     rates: VORBIS_RATES,
     codec: 'libvorbis',
@@ -178,6 +188,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   opus: {
     id: 'opus', knob: 'OPUS', name: 'OPUS', ext: 'opus', mime: 'audio/ogg',
+    blurb: 'Most efficient lossy · 48 kHz max',
     muxer: 'opus', lossless: false, coverArt: false,
     rates: OPUS_RATES,
     // NOTE: libopus encode crashes the current @ffmpeg/core wasm build
@@ -198,6 +209,7 @@ export const FORMATS: Record<FormatId, FormatDef> = {
 
   wma: {
     id: 'wma', knob: 'WMA', name: 'WMA V2 RETRO', ext: 'wma', mime: 'audio/x-ms-wma',
+    blurb: 'Retro Windows Media · for vintage players',
     muxer: 'asf', lossless: false, coverArt: false,
     rates: WMA_RATES,
     codec: 'wmav2',
@@ -212,12 +224,12 @@ export const FORMATS: Record<FormatId, FormatDef> = {
   },
 };
 
-/** knob ordering */
+/** display ordering */
 export const FORMAT_ORDER: FormatId[] = [
   'wav', 'aiff', 'flac', 'alac', 'wv', 'mp3', 'aac', 'ogg', 'opus', 'wma',
 ];
 
-/** sample-rate knob positions (subset filtered per-format) */
+/** sample-rate choices (subset filtered per-format) */
 export const RATE_CHOICES: number[] = [
   16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000,
 ];

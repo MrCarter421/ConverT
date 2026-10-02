@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// Capture the CT-505 in its natural habitats: idle, loaded, converting, done, tripping.
+// Capture ConverT in its natural habitats: idle, help, loaded, preset pop-up,
+// converting, done, options, Aurora Night skin, and phone width.
 
 import { spawn } from 'node:child_process';
-import { existsSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const PORT = 4604;
 const URL = `http://localhost:${PORT}/`;
 const ART = 'scripts/.artifacts';
+mkdirSync(ART, { recursive: true });
 
 function sineWav(rate, bits, seconds) {
   const ch = 2, frames = rate * seconds, bp = bits / 8, ba = ch * bp;
@@ -31,10 +33,10 @@ function sineWav(rate, bits, seconds) {
 }
 
 const files = [
-  ['dream-machine-909.wav', sineWav(44100, 16, 2)],
-  ['acid-bassline-303.wav', sineWav(48000, 16, 2)],
-  ['cosmic-jam-96k.wav', sineWav(96000, 24, 30)],
-  ['liquid-groove.wav', sineWav(44100, 16, 3)],
+  ['Aquarium Dreams.wav', sineWav(44100, 16, 2)],
+  ['Bubble Pop Anthem.wav', sineWav(48000, 16, 2)],
+  ['Vista Sunrise (Hi-Res Master).wav', sineWav(96000, 24, 30)],
+  ['Glass Garden.wav', sineWav(44100, 16, 3)],
 ];
 for (const [n, b] of files) writeFileSync(join(ART, n), b);
 
@@ -52,27 +54,38 @@ try {
     ...(exe ? { executablePath: exe } : {}),
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 1060 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  page.on('pageerror', (e) => console.error('[pageerror]', e.message));
   await page.goto(URL);
   await page.waitForFunction(() => window.__ct?.useCt.getState().engineState === 'ready', null, { timeout: 120000 });
+  await page.evaluate(() => window.__ct.setSettings({ autoDl: false, sound: false }));
   await page.screenshot({ path: join(ART, 'shot-idle.png') });
+  await page.click('.cap-btn[aria-label="How it works"]');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(ART, 'shot-help.png') });
+  await page.keyboard.press('Escape');
 
   await page.setInputFiles('input[type=file]', files.map(([n]) => join(ART, n)));
   await page.waitForFunction(() => {
     const fs = window.__ct.useCt.getState().files;
     return fs.length === 4 && fs.every((f) => f.status === 'ready');
   }, null, { timeout: 60000 });
+  await page.click('.pl-row:nth-child(3) .pl-hit');
   await page.screenshot({ path: join(ART, 'shot-loaded.png') });
 
-  // FLAC CD patch (dither+resample, slowest path) and catch it mid-flight on the big file
-  await page.evaluate(() => {
-    window.__ct.setFormat('flac');
-    window.__ct.setEdit({ quality: 'c8', rate: 44100, depth: 16, dither: 'shibata', norm: 'off', gainDb: 0 });
-    void window.__ct.startBatch();
-  });
+  await page.click('.preset-pill');
+  await page.click('[data-chip="format:flac"]');
+  await page.click('.disclosure');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(ART, 'shot-preset.png') });
+  await page.click('[data-preset="f-flac-cd-16-44-1"]');
+  await page.click('.done-btn');
+
+  // slowest path (resample + dither), caught mid-flight on the long file
+  await page.click('.go-btn');
   await page.waitForFunction(() => {
     const f = window.__ct.useCt.getState().files.find((x) => x.status === 'converting');
-    return f && f.name.includes('cosmic') && f.progress > 0.15 && f.progress < 0.97;
+    return f && f.name.includes('Vista') && f.progress > 0.2 && f.progress < 0.9;
   }, null, { timeout: 120000 });
   await page.screenshot({ path: join(ART, 'shot-converting.png') });
 
@@ -80,11 +93,28 @@ try {
     const s = window.__ct.useCt.getState();
     return !s.running && s.files.every((f) => f.status === 'done');
   }, null, { timeout: 240000 });
+  await page.waitForTimeout(400);
   await page.screenshot({ path: join(ART, 'shot-done.png') });
 
-  await page.evaluate(() => document.querySelector('.trip-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  await page.waitForTimeout(900);
-  await page.screenshot({ path: join(ART, 'shot-trip.png') });
+  await page.click('.cap-btn[aria-label="Options"]');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(ART, 'shot-options.png') });
+  await page.click('[data-chip="skin:night"]');
+  await page.click('.done-btn');
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: join(ART, 'shot-night.png') });
+  await page.click('.preset-pill');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(ART, 'shot-night-preset.png') });
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.__ct.setSettings({ skin: 'day' }));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(ART, 'shot-phone.png') });
+  await page.click('.preset-pill');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(ART, 'shot-phone-preset.png') });
   console.log('shots saved');
 } catch (e) {
   console.error('shots crashed:', String(e).slice(0, 300));
