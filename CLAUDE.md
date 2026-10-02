@@ -1,8 +1,9 @@
-# ConverT CT-505 — contributor notes
+# ConverT — contributor notes
 
-Browser-only batch audio converter (ffmpeg.wasm) styled as a Roland MC-505-era groovebox.
-React 19 + TypeScript + Vite + zustand. No server, no network at runtime — everything
-(fonts, wasm core) is bundled.
+Browser-only batch audio converter (ffmpeg.wasm). UI is a single compact "media player"
+window in a Frutiger Aero × Winamp-skin style: drop file → pick preset → press Convert →
+it downloads. Everything else lives in pop-ups. React 19 + TypeScript + Vite + zustand.
+No server, no network at runtime — everything (fonts, wasm core) is bundled.
 
 ## Commands
 
@@ -11,7 +12,7 @@ npm run dev        # vite dev server
 npm run build      # tsc -b && vite build  (run before e2e/sweep)
 npm run e2e        # headless-Chromium conversion tests + screenshots → scripts/.artifacts/
 node scripts/sweep-formats.mjs   # every format must encode; run after touching formats.ts
-node scripts/shots.mjs           # UI state screenshots (idle/loaded/converting/done/trip)
+node scripts/shots.mjs           # UI screenshots (idle/help/loaded/presets/converting/done/options/night/phone)
 node scripts/pages-smoke.mjs     # serves dist/ under a /ConverT/ subpath like GitHub Pages
 ```
 
@@ -24,7 +25,9 @@ Chromium for scripts comes from `/opt/pw-browsers/chromium` (playwright-core, no
 ## Architecture map
 
 - `src/audio/formats.ts` — declarative registry of target formats. **Adding a format is one
-  entry here**; knobs, LCD, presets and the arg builder derive everything from it.
+  entry here**; the preset window, display and arg builder derive everything from it.
+- `src/audio/presets.ts` — factory library (`group` = shelf in the preset window),
+  `presetTitle`/`presetDetail` plain-language descriptions, `dspFields` (what affects output).
 - `src/audio/args.ts` — `buildPlan()`: probe + preset → ffmpeg args. All quality doctrine
   lives here (resampler settings, dither rules, R128 two-pass, badges). Change DSP behavior
   ONLY here so the e2e checks keep meaning something.
@@ -32,9 +35,14 @@ Chromium for scripts comes from `/opt/pw-browsers/chromium` (playwright-core, no
 - `src/audio/engine/ffmpegEngine.ts` — the only file that knows about ffmpeg.wasm.
   Serializes every op through one queue (log capture is positional — never bypass it),
   auto-reloads the core after wasm faults (`noteFatal`).
-- `src/state/store.ts` — zustand store, batch runner, localStorage persistence,
-  `window.__ct` test hooks (e2e depends on these).
-- `src/ui/**` — faceplate components. Design tokens in `styles/base.css`.
+- `src/state/store.ts` — zustand store, batch runner, delivery (1 file → file, batch → zip),
+  localStorage persistence, popup state, `window.__ct` test hooks (e2e depends on these).
+- `src/ui/Player.tsx` — the main window: Display, SeekBar, Playlist, PresetPill, ConvertButton.
+  `src/ui/popups/` — Presets / Options / Help on a shared `Window` (Esc, backdrop, focus trap).
+  `src/ui/filePicker.tsx` owns the ONE `<input type=file>` (tests target it).
+- Styles: `styles/base.css` holds ALL tokens for both skins (`:root` = Aqua Day,
+  `:root[data-skin='night']` = Aurora Night) + shared controls (gel, chips, selects, switch).
+  Components read tokens only — a new skin is one token block.
 
 ## Hard-won facts (do not relearn these)
 
@@ -48,7 +56,7 @@ Chromium for scripts comes from `/opt/pw-browsers/chromium` (playwright-core, no
 - loudnorm measured values are scraped by regex from the log stream — the
   `[Parsed_loudnorm]` prefix is NOT reliably present per-line in wasm log events.
 - `body` must keep `background: transparent`; a body background paints over the fixed
-  `z-index:-1` psychedelic layer (CSS painting order).
+  `z-index:-1` sky layer (CSS painting order).
 - 24-bit output = `sample_fmt s32` + `-bits_per_raw_sample 24` (flac/alac/wavpack), or
   `pcm_s24le/be` for wav/aiff. Verified byte-level by e2e (FLAC STREAMINFO check).
 - The probe input and convert input are written to the wasm FS per job and deleted after;
@@ -56,8 +64,15 @@ Chromium for scripts comes from `/opt/pw-browsers/chromium` (playwright-core, no
 
 ## Conventions
 
+- **Never crowd the main window.** It holds display, file list, preset pill, convert button —
+  new features go in a pop-up (usually *More options* in `PresetWindow.tsx` or Options).
 - Factory presets are `factory: true` and never mutated; user presets persist to
-  localStorage (`convert.presets.v1`). The knob row edits an *edit buffer*, groovebox-style;
-  `presetSig` on results decides what re-queues when the patch changes.
+  localStorage (`convert.presets.v1`, `group: 'mine'`). The preset window edits an *edit
+  buffer* (`convert.edit.v1`) and the selected library id (`convert.current.v1`) — both
+  restored on boot, so the app reopens on the preset you left. Settings: `convert.settings.v2`.
+- `presetSig` (= `dspFields`) on results decides what re-queues when the preset changes;
+  names/ids/groups must never be part of it.
 - Sample-touching changes must extend `scripts/e2e.mjs` with a byte-level assertion.
-- UI copy is UPPERCASE-silkscreen voice ("BANKS FULL · 64 FILES MAX").
+  UI changes that alter the convert/download flow must keep the e2e "UI flow" block green.
+- Copy voice: the display (VT323) speaks UPPERCASE ("QUEUE FULL · 64 FILES MAX"); everything
+  else is friendly sentence case ("Drop audio files here").

@@ -1,4 +1,4 @@
-// ─── ConverT CT-505 · the gold cables ────────────────────────────────────────
+// ─── ConverT · the gold cables ───────────────────────────────────────────────
 // Builds FFmpeg invocations with audiophile discipline:
 //   · never touch samples unless the preset demands it
 //   · resample via soxr @ 28-bit precision when available, else swresample
@@ -191,7 +191,7 @@ export function buildPlan(
       ]
     : null;
 
-  // ── LCD badges ──
+  // ── display badges ──
   const touched = gainDb !== 0 || normOn || targetRate !== null || dither !== null || wantChannels !== null;
   if (fmt.lossless && srcLossless && !touched) badges.push('BIT PERFECT');
   if (!fmt.lossless && probe && !srcLossless) badges.push('GEN LOSS!');

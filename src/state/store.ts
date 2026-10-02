@@ -1,45 +1,52 @@
-// ─── ConverT CT-505 · state + batch runner ───────────────────────────────────
+// ─── ConverT · state + batch runner ──────────────────────────────────────────
 
 import { create } from 'zustand';
 import type {
-  EngineState, FileEntry, FormatId, LcdPage, Preset,
+  EngineState, FileEntry, FormatId, Popup, Preset, Skin,
 } from '../types';
 import { FORMATS, qualityOf, ratesForFormat } from '../audio/formats';
-import { DEFAULT_PRESET, FACTORY_PRESETS, autoName, newId, presetsEqual } from '../audio/presets';
+import {
+  DEFAULT_PRESET, FACTORY_PRESETS, autoName, dspFields, newId, presetsEqual,
+} from '../audio/presets';
 import { engine } from '../audio/engine/ffmpegEngine';
 import { sfx, setSoundEnabled } from '../ui/fx/sound';
 import { baseName } from '../util/fmt';
 import { downloadBlob, zipFiles } from '../util/files';
 
 export const MAX_FILES = 64;
-export const PADS_PER_BANK = 16;
 
 const LS_PRESETS = 'convert.presets.v1';
-const LS_SETTINGS = 'convert.settings.v1';
+const LS_SETTINGS = 'convert.settings.v2';
 const LS_EDIT = 'convert.edit.v1';
+const LS_CURRENT = 'convert.current.v1';
 
-interface Settings {
+export interface Settings {
   sound: boolean;
+  /** download results as soon as a batch finishes */
   autoDl: boolean;
-  trip: boolean;
+  /** batches of 2+ files arrive as one zip instead of separate downloads */
+  zipBatch: boolean;
+  skin: Skin;
+  /** animated background */
+  motion: boolean;
 }
 
-export interface CtState {
+export interface CtState extends Settings {
   engineState: EngineState;
   engineMsg: string;
   soxr: boolean;
   files: FileEntry[];
   selectedId: string | null;
-  bank: number;
+  /** the working preset — what CONVERT uses */
   edit: Preset;
   presets: Preset[];
-  presetIndex: number;
+  /** library preset the edit buffer was loaded from (may since be modified) */
+  presetId: string | null;
   running: boolean;
   stopFlag: boolean;
-  lcdPage: LcdPage;
-  trip: boolean;
-  sound: boolean;
-  autoDl: boolean;
+  /** files in the current / most recent batch */
+  runIds: string[];
+  popup: Popup;
   logs: string[];
   toast: string | null;
 }
@@ -61,31 +68,62 @@ function saveJson(key: string, value: unknown) {
 function loadPresets(): Preset[] {
   const user = loadJson<Preset[]>(LS_PRESETS) ?? [];
   const sane = user.filter((p) => p && p.id && p.format in FORMATS);
-  return [...FACTORY_PRESETS, ...sane.map((p) => ({ ...DEFAULT_PRESET, ...p, factory: false }))];
+  return [
+    ...FACTORY_PRESETS,
+    ...sane.map((p) => ({ ...DEFAULT_PRESET, ...p, factory: false, group: 'mine' as const })),
+  ];
 }
 
+const reducedMotion = (() => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+})();
+
 function loadSettings(): Settings {
-  return { sound: true, autoDl: false, trip: false, ...(loadJson<Partial<Settings>>(LS_SETTINGS) ?? {}) };
+  return {
+    sound: true,
+    autoDl: true,
+    zipBatch: true,
+    skin: 'day',
+    motion: !reducedMotion,
+    ...(loadJson<Partial<Settings>>(LS_SETTINGS) ?? {}),
+  };
+}
+
+/** the edit buffer survives reloads: you come back to the preset you left */
+function loadEdit(): Preset {
+  const saved = loadJson<Preset>(LS_EDIT);
+  const base = saved && saved.format in FORMATS ? { ...DEFAULT_PRESET, ...saved } : DEFAULT_PRESET;
+  return { ...base, id: 'edit', factory: false, group: undefined };
 }
 
 const bootSettings = loadSettings();
 setSoundEnabled(bootSettings.sound);
+// apply the skin before first paint — no flash of Aqua Day for Aurora Night users
+try { document.documentElement.dataset.skin = bootSettings.skin; } catch { /* no DOM */ }
+const bootPresets = loadPresets();
+const bootEdit = loadEdit();
+const bootPresetId = (() => {
+  const saved = loadJson<string>(LS_CURRENT);
+  if (saved && bootPresets.some((p) => p.id === saved)) return saved;
+  // first run (or a deleted preset): adopt whichever library preset matches
+  return bootPresets.find((p) => presetsEqual(p, bootEdit))?.id ?? null;
+})();
 
 // ── store ────────────────────────────────────────────────────────────────────
 
 export const useCt = create<CtState>(() => ({
   engineState: 'boot',
-  engineMsg: 'PRESS ANY KEY… JK. LOADING',
+  engineMsg: 'WARMING UP',
   soxr: false,
   files: [],
   selectedId: null,
-  bank: 0,
-  edit: { ...(loadJson<Preset>(LS_EDIT) ?? DEFAULT_PRESET), id: 'edit', factory: false },
-  presets: loadPresets(),
-  presetIndex: 0,
+  edit: bootEdit,
+  presets: bootPresets,
+  presetId: bootPresetId,
   running: false,
   stopFlag: false,
-  lcdPage: 'file',
+  runIds: [],
+  popup: null,
   ...bootSettings,
   logs: [],
   toast: null,
@@ -95,22 +133,22 @@ const get = useCt.getState;
 const set = useCt.setState;
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-export function flash(msg: string, ms = 2200) {
+export function flash(msg: string, ms = 2600) {
   set({ toast: msg });
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => set({ toast: null }), ms);
 }
 
 function persistEdit() {
-  const { edit } = get();
-  saveJson(LS_EDIT, edit);
+  saveJson(LS_EDIT, get().edit);
+  saveJson(LS_CURRENT, get().presetId);
 }
 function persistPresets() {
   saveJson(LS_PRESETS, get().presets.filter((p) => !p.factory));
 }
 function persistSettings() {
-  const { sound, autoDl, trip } = get();
-  saveJson(LS_SETTINGS, { sound, autoDl, trip });
+  const { sound, autoDl, zipBatch, skin, motion } = get();
+  saveJson(LS_SETTINGS, { sound, autoDl, zipBatch, skin, motion });
 }
 
 // ── engine boot ──────────────────────────────────────────────────────────────
@@ -121,10 +159,10 @@ export async function bootEngine() {
   booted = true;
   engine.onLog = (line) => {
     const logs = [...get().logs, line];
-    if (logs.length > 120) logs.splice(0, logs.length - 120);
+    if (logs.length > 200) logs.splice(0, logs.length - 200);
     set({ logs });
   };
-  set({ engineState: 'loading', engineMsg: 'LOADING DSP CORE (WASM)…' });
+  set({ engineState: 'loading', engineMsg: 'LOADING DSP CORE' });
   try {
     await engine.load();
     set({
@@ -162,12 +200,12 @@ export function addFiles(list: FileList | File[]) {
   if (!incoming.length) return;
   const room = MAX_FILES - get().files.length;
   if (room <= 0) {
-    flash('BANKS FULL · 64 FILES MAX');
+    flash(`QUEUE FULL · ${MAX_FILES} FILES MAX`);
     sfx.error();
     return;
   }
   const taken = incoming.slice(0, room);
-  if (taken.length < incoming.length) flash(`BANKS FULL · ${incoming.length - taken.length} SKIPPED`);
+  if (taken.length < incoming.length) flash(`QUEUE FULL · ${incoming.length - taken.length} SKIPPED`);
   const entries: FileEntry[] = taken.map((file) => ({
     id: newId('f'),
     file,
@@ -176,68 +214,39 @@ export function addFiles(list: FileList | File[]) {
     status: 'probing',
     progress: 0,
   }));
-  const files = [...get().files, ...entries];
-  set({
-    files,
-    selectedId: get().selectedId ?? entries[0].id,
-    lcdPage: 'file',
-    bank: Math.floor((files.length - 1) / PADS_PER_BANK),
-  });
+  set({ files: [...get().files, ...entries] });
   sfx.pad();
   if (engine.ready) entries.forEach((e) => void probeEntry(e.id));
 }
 
 export function removeFile(id: string) {
   const f = get().files.find((x) => x.id === id);
-  if (!f || f.status === 'converting') return;
+  if (!f || f.status === 'converting' || f.status === 'queued') return;
   if (f.result) URL.revokeObjectURL(f.result.url);
-  const files = get().files.filter((x) => x.id !== id);
   set({
-    files,
-    selectedId: get().selectedId === id ? (files[0]?.id ?? null) : get().selectedId,
-    bank: Math.min(get().bank, Math.max(0, Math.ceil(files.length / PADS_PER_BANK) - 1)),
+    files: get().files.filter((x) => x.id !== id),
+    selectedId: get().selectedId === id ? null : get().selectedId,
   });
   sfx.click();
-}
-
-export function clearDone() {
-  get().files.forEach((f) => { if (f.status === 'done' && f.result) URL.revokeObjectURL(f.result.url); });
-  const files = get().files.filter((f) => f.status !== 'done');
-  set({ files, selectedId: files[0]?.id ?? null, bank: 0 });
-  flash('DONE SLOTS CLEARED');
 }
 
 export function clearAll() {
   if (get().running) return;
   get().files.forEach((f) => { if (f.result) URL.revokeObjectURL(f.result.url); });
-  set({ files: [], selectedId: null, bank: 0 });
-  flash('ALL BANKS CLEARED');
-}
-
-export function selectFile(id: string) {
-  set({ selectedId: id, lcdPage: 'file' });
+  set({ files: [], selectedId: null, runIds: [] });
   sfx.click();
 }
 
-export function stepFile(dir: 1 | -1) {
-  const { files, selectedId } = get();
-  if (!files.length) return;
-  const i = Math.max(0, files.findIndex((f) => f.id === selectedId));
-  const next = files[(i + dir + files.length) % files.length];
-  set({ selectedId: next.id, bank: Math.floor(files.indexOf(next) / PADS_PER_BANK) });
+/** select a file to inspect; selecting it again closes the details */
+export function toggleSelect(id: string) {
+  set({ selectedId: get().selectedId === id ? null : id });
   sfx.tick();
 }
 
-export function setBank(bank: number) {
-  set({ bank });
-  sfx.click();
-}
-
-// ── preset editing (knobs write to the edit buffer, groovebox style) ─────────
+// ── preset editing ───────────────────────────────────────────────────────────
 
 export function setEdit(patch: Partial<Preset>) {
-  const edit = { ...get().edit, ...patch };
-  set({ edit });
+  set({ edit: { ...get().edit, ...patch } });
   persistEdit();
   sfx.tick();
 }
@@ -245,9 +254,9 @@ export function setEdit(patch: Partial<Preset>) {
 export function setFormat(format: FormatId) {
   const fmt = FORMATS[format];
   const edit = { ...get().edit, format };
-  // reconcile knobs that the new format constrains
-  edit.quality = qualityOf(fmt, edit.quality).id === edit.quality ? edit.quality : fmt.defaultQuality;
+  // reconcile settings the new format constrains
   if (!fmt.qualities.some((v) => v.id === edit.quality)) edit.quality = fmt.defaultQuality;
+  edit.quality = qualityOf(fmt, edit.quality).id;
   if (edit.rate !== 'keep' && !ratesForFormat(fmt).includes(edit.rate)) edit.rate = 'keep';
   if (edit.depth !== 'keep' && (!fmt.depths || !fmt.depths.includes(edit.depth))) edit.depth = 'keep';
   set({ edit });
@@ -255,75 +264,67 @@ export function setFormat(format: FormatId) {
   sfx.tick();
 }
 
-export function editDirty(): boolean {
-  const { edit, presets, presetIndex } = get();
-  const loaded = presets[presetIndex];
-  return !loaded || !presetsEqual(edit, loaded);
+/** library preset the edit buffer came from, if any */
+export function loadedPreset(s: Pick<CtState, 'presets' | 'presetId'> = get()): Preset | undefined {
+  return s.presets.find((p) => p.id === s.presetId);
 }
 
-export function dialPreset(delta: number) {
-  const { presets } = get();
-  if (!presets.length) return;
-  const index = ((get().presetIndex + delta) % presets.length + presets.length) % presets.length;
-  loadPresetIndex(index);
+/** edit buffer differs from the library preset it was loaded from */
+export function isModified(s: Pick<CtState, 'presets' | 'presetId' | 'edit'> = get()): boolean {
+  const p = loadedPreset(s);
+  return !p || !presetsEqual(p, s.edit);
 }
 
-export function loadPresetIndex(index: number) {
-  const p = get().presets[index];
+export function loadPreset(id: string) {
+  const p = get().presets.find((x) => x.id === id);
   if (!p) return;
-  set({ presetIndex: index, edit: { ...p, id: 'edit', factory: false }, lcdPage: 'preset' });
+  set({ presetId: id, edit: { ...p, id: 'edit', factory: false, group: undefined } });
   persistEdit();
   sfx.tick();
 }
 
-export function savePreset() {
+export function savePreset(name?: string) {
   const { edit, presets } = get();
-  const p: Preset = { ...edit, id: newId('u'), name: autoName(edit), factory: false };
-  const next = [...presets, p];
-  set({ presets: next, presetIndex: next.length - 1 });
+  const clean = (name ?? '').trim().slice(0, 40) || autoName(edit);
+  const p: Preset = { ...edit, id: newId('u'), name: clean, factory: false, group: 'mine' };
+  set({ presets: [...presets, p], presetId: p.id, edit: { ...edit, name: clean } });
   persistPresets();
-  flash(`WROTE ${p.name}`);
+  persistEdit();
+  flash(`SAVED PRESET · ${clean.toUpperCase()}`);
   sfx.start();
 }
 
-export function deletePreset() {
-  const { presets, presetIndex } = get();
-  const p = presets[presetIndex];
+export function deletePreset(id: string) {
+  const p = get().presets.find((x) => x.id === id);
   if (!p) return;
   if (p.factory) {
-    flash('FACTORY PATCH · LOCKED');
+    flash('FACTORY PRESETS ARE LOCKED');
     sfx.error();
     return;
   }
-  const next = presets.filter((_, i) => i !== presetIndex);
-  set({ presets: next, presetIndex: Math.min(presetIndex, next.length - 1) });
+  set({
+    presets: get().presets.filter((x) => x.id !== id),
+    presetId: get().presetId === id ? null : get().presetId,
+  });
   persistPresets();
-  flash(`DELETED ${p.name}`);
-}
-
-// ── system toggles ───────────────────────────────────────────────────────────
-
-export function setPage(lcdPage: LcdPage) {
-  set({ lcdPage });
+  persistEdit();
+  flash(`DELETED · ${p.name.toUpperCase()}`);
   sfx.click();
 }
 
-export function toggleTrip() {
-  set({ trip: !get().trip });
-  persistSettings();
-  sfx.start();
+// ── popups + settings ────────────────────────────────────────────────────────
+
+export function openPopup(popup: Popup) {
+  set({ popup });
+  sfx.click();
+}
+export function closePopup() {
+  if (get().popup) set({ popup: null });
 }
 
-export function toggleSound() {
-  const sound = !get().sound;
-  set({ sound });
-  setSoundEnabled(sound);
-  persistSettings();
-  if (sound) sfx.click();
-}
-
-export function toggleAutoDl() {
-  set({ autoDl: !get().autoDl });
+export function setSettings(patch: Partial<Settings>) {
+  set(patch);
+  if (patch.sound !== undefined) setSoundEnabled(patch.sound);
   persistSettings();
   sfx.click();
 }
@@ -331,27 +332,48 @@ export function toggleAutoDl() {
 // ── batch runner ─────────────────────────────────────────────────────────────
 
 export function presetSig(p: Preset): string {
-  return JSON.stringify({ ...p, id: 0, name: 0, factory: 0 });
+  return JSON.stringify(dspFields(p));
+}
+
+/** files the CONVERT button would run with the current preset */
+export function pendingFiles(s: Pick<CtState, 'files' | 'edit'> = get()): FileEntry[] {
+  const sig = presetSig(s.edit);
+  return s.files.filter(
+    (f) => f.status === 'ready' || f.status === 'error' ||
+      (f.status === 'done' && f.result?.presetSig !== sig),
+  );
+}
+
+/** 0..1 across the current / last batch */
+export function runProgress(s: Pick<CtState, 'files' | 'runIds'> = get()): number {
+  if (!s.runIds.length) return 0;
+  let sum = 0;
+  for (const id of s.runIds) {
+    const f = s.files.find((x) => x.id === id);
+    if (!f || f.status === 'done' || f.status === 'error') sum += 1;
+    else if (f.status === 'converting') sum += f.progress;
+  }
+  return sum / s.runIds.length;
 }
 
 export async function startBatch() {
   const s = get();
   if (s.running || s.engineState !== 'ready') return;
-  const sig = presetSig(s.edit);
-  const queue = s.files.filter(
-    (f) => f.status === 'ready' || f.status === 'error' ||
-      (f.status === 'done' && f.result?.presetSig !== sig),
-  );
+  // snapshot: editing the preset mid-batch must not change files already queued
+  const preset = s.edit;
+  const sig = presetSig(preset);
+  const queue = pendingFiles(s);
   if (!queue.length) {
-    flash(s.files.length ? 'ALL DONE · SAME PATCH' : 'LOAD FILES FIRST');
+    flash(s.files.length ? 'ALL DONE · SAME PRESET' : 'ADD SOME FILES FIRST');
     sfx.error();
     return;
   }
   sfx.start();
-  set({ running: true, stopFlag: false });
+  set({ running: true, stopFlag: false, runIds: queue.map((f) => f.id) });
   queue.forEach((f) => patchFile(f.id, { status: 'queued', error: undefined, progress: 0 }));
 
   let hadError = false;
+  const converted: string[] = [];
   for (const item of queue) {
     if (get().stopFlag) break;
     const entry = get().files.find((f) => f.id === item.id);
@@ -359,29 +381,27 @@ export async function startBatch() {
 
     if (entry.result) URL.revokeObjectURL(entry.result.url);
     patchFile(entry.id, { status: 'converting', progress: 0, phase: 'encode', result: undefined });
-    set({ selectedId: entry.id, bank: Math.floor(get().files.findIndex((f) => f.id === entry.id) / PADS_PER_BANK) });
 
     const t0 = performance.now();
     try {
       const out = await engine.convert(
         entry.file,
-        get().edit,
+        preset,
         entry.probe,
         (p, phase) => patchFile(entry.id, { progress: p, phase }),
       );
       const blob = new Blob([out.bytes as Uint8Array<ArrayBuffer>], { type: out.mime });
-      const outName = `${baseName(entry.name)}.${out.ext}`;
       const result = {
         url: URL.createObjectURL(blob),
         size: blob.size,
-        outName,
+        outName: `${baseName(entry.name)}.${out.ext}`,
         mime: out.mime,
         badges: out.badges,
         elapsedMs: performance.now() - t0,
         presetSig: sig,
       };
       patchFile(entry.id, { status: 'done', progress: 1, result });
-      if (get().autoDl) downloadBlob(result.url, outName);
+      converted.push(entry.id);
     } catch (e) {
       if (engine.wasCancelled || get().stopFlag) {
         patchFile(entry.id, { status: 'ready', progress: 0 });
@@ -397,19 +417,20 @@ export async function startBatch() {
   const wasStopped = get().stopFlag;
   get().files.forEach((f) => { if (f.status === 'queued') patchFile(f.id, { status: 'ready', progress: 0 }); });
   set({ running: false, stopFlag: false });
+  if (wasStopped) return;
 
-  if (!wasStopped) {
-    const done = get().files.filter((f) => f.status === 'done').length;
-    if (done > 0 && !hadError) sfx.done();
-    flash(hadError ? 'BATCH DONE · WITH ERRORS' : done ? `BATCH DONE · ${done} FILES` : 'STOPPED');
-  }
+  if (converted.length && !hadError) sfx.done();
+  flash(hadError
+    ? `DONE WITH ERRORS · ${converted.length}/${queue.length} OK`
+    : `DONE · ${converted.length} FILE${converted.length === 1 ? '' : 'S'} CONVERTED`);
+  if (get().autoDl && converted.length) await deliver(converted);
 }
 
 export async function stopBatch() {
   if (!get().running) return;
   set({ stopFlag: true });
   await engine.cancel();
-  flash('STOPPED · DSP CORE RESET');
+  flash('STOPPED');
   sfx.error();
 }
 
@@ -423,30 +444,46 @@ export function downloadOne(id: string) {
   }
 }
 
-export async function downloadAll() {
-  const done = get().files.filter((f) => f.status === 'done' && f.result);
-  if (!done.length) {
-    flash('NOTHING TO DOWNLOAD');
-    sfx.error();
-    return;
-  }
-  sfx.click();
+/** hand results to the user: one file → itself, a batch → a zip (or each file) */
+async function deliver(ids: string[]) {
+  const done = ids
+    .map((id) => get().files.find((f) => f.id === id))
+    .filter((f): f is FileEntry => Boolean(f?.status === 'done' && f.result));
+  if (!done.length) return;
   if (done.length === 1) {
     downloadOne(done[0].id);
+    return;
+  }
+  if (!get().zipBatch) {
+    // browsers throttle bursts of downloads — space them out
+    for (const f of done) {
+      downloadOne(f.id);
+      await new Promise((r) => setTimeout(r, 350));
+    }
     return;
   }
   flash('PACKING ZIP…', 60000);
   try {
     const blob = await zipFiles(done.map((d) => ({ name: d.result!.outName, url: d.result!.url })));
     const url = URL.createObjectURL(blob);
-    downloadBlob(url, `ConverT-batch-${new Date().toISOString().slice(0, 10)}.zip`);
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    const ext = done[0].result!.outName.split('.').pop() ?? 'audio';
+    downloadBlob(url, `ConverT-${ext}-${new Date().toISOString().slice(0, 10)}.zip`);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
     flash(`ZIPPED ${done.length} FILES`);
-    sfx.done();
   } catch (e) {
     flash(`ZIP FAILED: ${String(e).slice(0, 40)}`);
     sfx.error();
   }
+}
+
+export async function downloadAll() {
+  const done = get().files.filter((f) => f.status === 'done' && f.result);
+  if (!done.length) {
+    flash('NOTHING TO DOWNLOAD YET');
+    sfx.error();
+    return;
+  }
+  await deliver(done.map((f) => f.id));
 }
 
 // expose for e2e tests + curious consoles
@@ -456,6 +493,7 @@ declare global {
 if (typeof window !== 'undefined') {
   window.__ct = {
     useCt, addFiles, startBatch, stopBatch, setEdit, setFormat,
-    loadPresetIndex, savePreset, downloadAll, engine, FORMATS,
+    loadPreset, savePreset, deletePreset, downloadAll, setSettings, openPopup, closePopup,
+    engine, FORMATS,
   };
 }

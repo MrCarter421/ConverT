@@ -1,4 +1,4 @@
-// ─── ConverT CT-505 · DSP core (ffmpeg.wasm engine) ──────────────────────────
+// ─── ConverT · DSP core (ffmpeg.wasm engine) ─────────────────────────────────
 // Engine abstraction: today a single-threaded ffmpeg.wasm core; the interface
 // is deliberately narrow so a multithreaded core or a native backend can slot
 // in later without touching the UI.
@@ -228,7 +228,7 @@ export class FFmpegEngine {
     }
   }
 
-  /** Dry-run plan for LCD display (badges, effective values). */
+  /** Dry-run plan for the display (badges, effective values). */
   plan(preset: Preset, probe: ProbeInfo | undefined) {
     return buildPlan(preset, probe, { inputName: 'in', soxr: this.soxr });
   }

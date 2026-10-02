@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// ConverT CT-505 end-to-end test.
+// ConverT end-to-end test.
 // Builds nothing itself — run `npm run build` first. Serves dist via `vite preview`,
 // drives the app in headless Chromium, converts real audio through the wasm DSP,
 // and byte-verifies the outputs.
 
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -150,6 +150,8 @@ try {
   );
   const soxr = await page.evaluate(() => window.__ct.engine.soxr);
   mark(`DSP ready · soxr available: ${soxr}`);
+  // DSP batches below inspect results in-page; the UI flow at the end tests downloads
+  await page.evaluate(() => window.__ct.setSettings({ autoDl: false, sound: false }));
 
   await page.screenshot({ path: join(ART, 'ui-idle.png'), fullPage: true });
 
@@ -280,10 +282,67 @@ try {
     check(`r128 badge (${r.name})`, r.badges.some((b) => b.includes('R128')), JSON.stringify(r.badges));
   }
 
-  // trip mode screenshot for the vibes archive
-  await page.evaluate(() => window.__ct.useCt.getState().trip || document.querySelector('.trip-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: join(ART, 'ui-trip.png'), fullPage: true });
+  // 6 · the real UI flow: pop-up → format + quality → CONVERT → file downloads
+  mark('UI flow: preset pop-up + convert + auto-download');
+  await page.click('.pl-foot .pl-link:has-text("Clear")');
+  await page.evaluate(() => window.__ct.setSettings({ autoDl: true, zipBatch: true }));
+  await page.setInputFiles('input[type=file]', [wav44]);
+  await page.waitForFunction(() => window.__ct.useCt.getState().files[0]?.status === 'ready', null, { timeout: 45000 });
+  await page.click('.preset-pill');
+  await page.waitForSelector('.preset-win');
+  await page.click('[data-chip="format:mp3"]');
+  await page.click('[data-chip="quality:v0"]');
+  await page.screenshot({ path: join(ART, 'ui-preset.png') });
+  await page.click('.done-btn');
+  check('pop-up closes on Done', await page.$('.preset-win') === null);
+  const pill = await page.textContent('.pill-title');
+  check('pill shows dialed-in preset', pill.includes('MP3') && pill.includes('V0'), pill);
+
+  const [dl1] = await Promise.all([
+    page.waitForEvent('download', { timeout: 120000 }),
+    page.click('.go-btn'),
+  ]);
+  const name1 = dl1.suggestedFilename();
+  const path1 = join(ART, `dl-${name1}`);
+  await dl1.saveAs(path1);
+  const b1 = readFileSync(path1);
+  check('single file auto-downloads as .mp3', name1 === 'tone-44k16.mp3', name1);
+  check('downloaded mp3 bytes valid',
+    (b1[0] === 0x49 && b1[1] === 0x44 && b1[2] === 0x33) || (b1[0] === 0xff && (b1[1] & 0xe0) === 0xe0),
+    `${b1.length}B`);
+  check('button flips to Save when all done', (await page.textContent('.go-btn')).includes('Save'));
+
+  // second file + a quality change re-queues both → one zip
+  await page.setInputFiles('input[type=file]', [wav96]);
+  await page.waitForFunction(() => window.__ct.useCt.getState().files[1]?.status === 'ready', null, { timeout: 45000 });
+  await page.click('.preset-pill');
+  await page.click('[data-chip="quality:cbr256"]');
+  await page.keyboard.press('Escape');
+  check('Esc closes pop-up', await page.$('.preset-win') === null);
+  const [dl2] = await Promise.all([
+    page.waitForEvent('download', { timeout: 180000 }),
+    page.click('.go-btn'),
+  ]);
+  const name2 = dl2.suggestedFilename();
+  const path2 = join(ART, `dl-${name2}`);
+  await dl2.saveAs(path2);
+  const b2 = readFileSync(path2);
+  const entries = b2.toString('latin1').split('PK\x03\x04').length - 1;
+  check('batch auto-downloads one zip', /^ConverT-mp3-\d{4}-\d\d-\d\d\.zip$/.test(name2), name2);
+  check('zip holds both files', b2.readUInt32LE(0) === 0x04034b50 && entries === 2, `${entries} entries`);
+  await page.screenshot({ path: join(ART, 'ui-done.png') });
+
+  // the preset you left is the preset you get back
+  await page.click('.preset-pill');
+  await page.click('[data-preset="f-aac-256-kbps"]');
+  await page.click('.done-btn');
+  await page.reload();
+  await page.waitForSelector('.pill-title');
+  const after = await page.evaluate(() => {
+    const s = window.__ct.useCt.getState();
+    return { title: document.querySelector('.pill-title').textContent, format: s.edit.format, quality: s.edit.quality, presetId: s.presetId };
+  });
+  check('preset survives reload', after.title === 'AAC · 256 kbps' && after.format === 'aac' && after.quality === 'b256' && after.presetId === 'f-aac-256-kbps', JSON.stringify(after));
 
   mark(`${failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} CHECK(S) FAILED`}`);
   process.exitCode = failures === 0 ? 0 : 1;
